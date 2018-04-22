@@ -19,7 +19,8 @@
 <nav class="navbar navbar-expand-sm navbar-toggleable-md bg-dark navbar-dark">
   <a class="navbar-brand" href="#">
     Youtube Downloader
-  </a> 
+  </a>
+  <small style="margin-left: auto; color: white;">v0.9</small>
 </nav>
 
 <br>
@@ -67,19 +68,23 @@
                             <td>{{x.qualidade}}</td>
                             <td>{{x.tipo}}</td>
                             <td>
-                                <a href="{{x.url}}">
+                                <a href="{{x.url}}" download>
                                     <button class="btn btn-primary" style="cursor: pointer;">Download</button>
                                 </a>
                             </td>
                         </tr>
                     </tbody>
                 </table>
+                <button class="btn btn-success float-right" ng-click="voltar()" style="cursor: pointer;">Voltar</button>
             </div>
         </div>
     </div>
 </div>
 
 <script type="text/javascript">
+    /*
+        Author: Matheus Alves de Andrade
+     */
    var app = angular.module("App", []);
 
    app.service('requisitarInfos', function($http) {
@@ -174,6 +179,13 @@
             $scope.getInfos(cod);
         };
 
+        $scope.voltar = function() {
+            $scope.mensagemTelaInicial = 'Buscar vídeo';
+            $scope.exibirTelaBusca();
+            $scope.urlVideo = '';
+            $scope.infos = null;
+        };
+
         $scope.exibirTelaBusca = function() {
             $scope.mostrarTelaDownload = false;
             $scope.mostrarTelaInserirURL = true;
@@ -182,6 +194,7 @@
             $scope.mostrarTelaDownload = true;
             $scope.mostrarTelaInserirURL = false;
         };
+
     });
 </script>
 </body>
