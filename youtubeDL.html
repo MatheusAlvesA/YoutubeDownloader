@@ -1,11 +1,3 @@
-<?php
-
-$infos_query = get_infos_raw($_GET['v']);
-
-$dados = tratar_dados(get_download_urls($infos_query));
-
-?>
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -37,26 +29,28 @@ $dados = tratar_dados(get_download_urls($infos_query));
 <br>
 
 <div class="container-fluid">
-    <div class="row">
+    <div class="row" ng-controller="Controle">
         <div class="col-md-8 offset-md-2">
             <div id="tela_OpcoesDownload" class="container-fluid">
                 <hr>
                 <table class="table table-dark table-hover table-responsive-sm">
                     <thead>
-                    <tr>
-                        <td>Qualidade</td>
-                        <td>Tipo</td>
-                        <td>Download</td>
-                    </tr>
+                        <tr>
+                            <td>Qualidade</td>
+                            <td>Tipo</td>
+                            <td>Download</td>
+                        </tr>
                     </thead>
                     <tbody>
-                    <?php 
-                        foreach ($dados as $video) {
-                            echo '<tr><td>'.$video['qualidade'].'</td>';
-                            echo '<td>'.$video['tipo'].'</td>';
-                            echo '<td><a href="'.$video['url'].'"><button class="btn btn-primary" style="cursor: pointer">Download</button></a></td></tr>';
-                        }
-                    ?>
+                        <tr ng-repeat="x in infos">
+                            <td>{{x.qualidade}}</td>
+                            <td>{{x.tipo}}</td>
+                            <td>
+                                <a href="{{x.url}}">
+                                    <button class="btn btn-primary" style="cursor: pointer;">Download</button>
+                                </a>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -65,41 +59,79 @@ $dados = tratar_dados(get_download_urls($infos_query));
 </div>
 
 <script type="text/javascript">
-    //todo
+   var app = angular.module("App", []);
+
+   app.service('requisitarInfos', function($http) {
+        this.proxyCors = 'https://cors.io/?';                       //Um proxy para burlar cors
+        this.url = 'http://youtube.com/get_video_info?video_id=';   //A API do youtube que retorna informações de um vídeo
+
+        this.get = function (cod, sucesso, falha) {
+            $http({
+                method: 'GET',
+                url: this.proxyCors+this.url+cod // consultado a api através do proxy
+            }).then(sucesso, falha);
+        }
+    });
+
+    app.service('decodificar', function() {
+        /*
+            Essa fução recebe uma QueryString e retorna um array associativo equivalente
+        */
+        this.queryString = function (queryRaw) {
+            let interador = (new URLSearchParams(queryRaw)).entries(); // Suportado somente por Chrome >= 29.0 e Firefox >= 44.0
+            let retorno = [];
+            for(let elemento of interador) {
+                retorno[elemento[0]] = elemento[1]; // associando cada chave a seu valor
+            }
+            return retorno;
+        }
+    });
+
+    app.service('mensagemERRO', function() {
+      this.conexaoServidor = function () {
+        document.getElementById('mensagemErroConexao').style.display = 'block';
+        setTimeout(function(){document.getElementById('mensagemErroConexao').style.display = 'none';}, 5000);
+      };
+      this.erroNaConsulta = function () {
+        document.getElementById('mensagemErro').style.display = 'block';
+        setTimeout(function(){document.getElementById('mensagemErro').style.display = 'none';}, 5000);
+      };
+    });
+
+    //#########INICIO DO CONTROLLER#############
+    app.controller("Controle", function($scope, requisitarInfos, mensagemERRO, decodificar) {
+        $scope.infos = null;
+        /*
+            Esta fuñção recebe um código de vídeo do youtube e transforma as informações sobre ele em um object no formato:
+            {
+                tipo: "O formato do arquivo de vídeo",
+                qualidade: "Uma string que informa a qualidade do vídeo",
+                url: "A url de download do vídeo",
+            }
+            as informações vão ser salvas em $scope.infos ao final da execução
+        */
+        $scope.getInfos = function (cod) {
+            requisitarInfos.get(cod, // requisitando a API
+                function (dados){ // Callback de sucesso na requisição
+                    dados = dados.data; //descartando informações desnescesárias
+                    let dadosTratados = decodificar.queryString(dados); // Todas as informações retornadas
+
+                    let videos  = dadosTratados['url_encoded_fmt_stream_map'].split(','); // filtrando só o que é nescesário
+                    $scope.infos = videos.map(function (valor) { // percorrendo os formatos de vídeo retornados pela api
+                        let elemento = decodificar.queryString(valor); // Decodificando novamente do formato querystring para vetor associativo
+                        return { // retornando um objeto como descrito anteriormente
+                            qualidade: elemento.quality,
+                            tipo: elemento.type.split(';')[0],
+                            url: elemento.url
+                        };
+                    });
+                },
+                function(dados) {mensagemERRO.conexaoServidor();} // Callback de erro na requisição
+            );
+        };
+
+        $scope.getInfos('BYRoa-3cmII'); //debug
+    });
 </script>
 </body>
 </html>
-
-<?php
-//ZONA DE FUNÇÕES
-
-function get_download_urls($infos_query) {
-    parse_str($infos_query, $infos);
-    
-    $streams_raw = explode(',', $infos['url_encoded_fmt_stream_map']);
-    
-    $streams = array_map(
-        function($valor) {
-            parse_str($valor, $temp);
-            return $temp;
-        }
-    , $streams_raw);
-    
-    return $streams;
-}
-
-function tratar_dados($dados) {
-    return array_map(function($dados){
-        return [
-                'qualidade' => $dados['quality'],
-                'url' => $dados['url'],
-                'tipo' => explode(';', $dados['type'])[0]
-            ];
-    }, $dados);
-}
-
-function get_infos_raw($cod) {
-    $URL_YT_INFOS = 'http://youtube.com/get_video_info?video_id=';
-    return file_get_contents($URL_YT_INFOS.$cod);
-}
-?>
